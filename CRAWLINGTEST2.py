@@ -13,66 +13,63 @@ options = webdriver.ChromeOptions()
 driver = webdriver.Chrome(service=service, options=options)
 
 
-def get_movie(url):
-    driver.get(url)
-    for i in range(2, 6):
-        test_xpath = f'//*[@id="content"]/div[2]/ul/li[1]/div[{i}]/strong'
-        try:
-            element = driver.find_element(By.XPATH, test_xpath)
-            if element.text == '소개':
-                div_index = i
-                break
-        except:
-            continue
-    else:
-        print(f'Error on {url}: Unable to determine the div index')
-        return None, None
+def save_urls_to_file(start, end, urls):
+    filename = f"action{start}to{end}.txt"
+    with open(filename, 'w', encoding='utf-8') as file:
+        for url in urls:
+            file.write(url + '\\n')
+    return filename
 
-    description_xpath = f'//*[@id="content"]/div[2]/ul/li[1]/div[{div_index}]/p'
-    title_xpath = '//*[@id="content"]/div[2]/div/div[1]/div[1]/strong'
-    try:
-        title = driver.find_element(By.XPATH, title_xpath).text
-        description = driver.find_element(By.XPATH, description_xpath).text
-    except Exception as e:
-        print(f'Error: {e}')
-        return None, None
 
-    return title, description
+def merge_files(filenames):
+    with open('all_movie_urls.txt', 'w', encoding='utf-8') as outfile:
+        for fname in filenames:
+            with open(fname, 'r', encoding='utf-8') as infile:
+                outfile.write(infile.read())
 
 
 def get_all_movies(url):
     driver.get(url)
     movie_count = 0
     movie_urls = []
+    files_created = []
 
     # Extend the movie list
     while movie_count < 3000:
         try:
-            # Click on the "Load More" button
             load_more_button = driver.find_element(By.XPATH, '//*[@id="content"]/div[2]/button')
             load_more_button.click()
             time.sleep(1)
-            movie_count += 30  # Each click loads 30 more movies
+            movie_count += 30
         except NoSuchElementException:
             break
 
-    # Collect all movie URLs without navigating away
+    # Collect all movie URLs without navigating away and save in batches of 100
     for i in range(1, movie_count + 1):
         movie_xpath = f'//*[@id="content"]/div[1]/ul/li[{i}]/a'
-        print(i, end=' ')
         try:
             movie_element = driver.find_element(By.XPATH, movie_xpath)
             movie_urls.append(movie_element.get_attribute('href'))
+
+            # Save to file every 100 URLs
+            if i % 100 == 0:
+                start = i - 99
+                end = i
+                file_created = save_urls_to_file(start, end, movie_urls)
+                files_created.append(file_created)
+                movie_urls.clear()
         except Exception as e:
             print(f"Error collecting URL for movie {i}: {e}")
 
-    # Fetch details for each movie using the collected URLs
-    for movie_url in movie_urls:
-        title, description = get_movie(movie_url)
-        if title and description:
-            print(f"Title: {title}")
-            print(f"Description: {description}")
-            print("=" * 50)
+    # Save any remaining URLs to file
+    if movie_urls:
+        start = (i // 100) * 100 + 1
+        end = i
+        file_created = save_urls_to_file(start, end, movie_urls)
+        files_created.append(file_created)
+
+    # Merge all files into one
+    merge_files(files_created)
 
     driver.quit()
 
