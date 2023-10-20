@@ -69,7 +69,7 @@ def get_all_movies(url):
     #     files_created.append(file_created)
 
     # Merge all files into one
-    merge_files(files_created)
+    #merge_files(files_created)
 
     driver.quit()
 
